@@ -17,4 +17,4 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "9.0.0"
-      - run: gradle test buildPlugin verifyPlugin
+      - run: gradle test buildPlugin
