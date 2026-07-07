@@ -32,6 +32,7 @@ dependencies {
 
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
     testImplementation(kotlin("test-junit5"))
+    testRuntimeOnly("junit:junit:4.13.2")
 }
 
 intellijPlatform {
