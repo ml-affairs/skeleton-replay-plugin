@@ -1,0 +1,37 @@
+<idea-plugin>
+  <id>com.mlaffairs.skeleton</id>
+  <name>Skeleton Replay</name>
+  <vendor email="christos.hadjinikolis.subs@gmail.com" url="https://github.com/ml-affairs/skeleton">ML Affairs</vendor>
+
+  <depends>com.intellij.modules.platform</depends>
+  <depends>com.intellij.modules.python</depends>
+
+  <extensions defaultExtensionNs="com.intellij">
+    <toolWindow
+      id="Skeleton"
+      anchor="right"
+      factoryClass="com.mlaffairs.skeleton.plugin.SkeletonToolWindowFactory"
+      icon="/icons/skeleton.svg"
+      canCloseContents="false" />
+    <projectConfigurable
+      parentId="tools"
+      instance="com.mlaffairs.skeleton.plugin.SkeletonSettingsConfigurable"
+      id="com.mlaffairs.skeleton.settings"
+      displayName="Skeleton Replay" />
+    <notificationGroup
+      id="Skeleton Replay"
+      displayType="BALLOON"
+      isLogByDefault="true" />
+  </extensions>
+
+  <actions>
+    <action
+      id="Skeleton.ReplayCurrentFile"
+      class="com.mlaffairs.skeleton.plugin.ReplayCurrentFileAction"
+      text="Replay with Skeleton"
+      description="Run the selected Python file through Skeleton Replay">
+      <add-to-group group-id="ProjectViewPopupMenu" anchor="last" />
+      <add-to-group group-id="EditorPopupMenu" anchor="last" />
+    </action>
+  </actions>
+</idea-plugin>
