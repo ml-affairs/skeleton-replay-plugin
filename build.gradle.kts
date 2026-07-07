@@ -28,11 +28,10 @@ dependencies {
         bundledPlugin("PythonCore")
         pluginVerifier()
         zipSigner()
-        testFramework(org.jetbrains.intellij.platform.gradle.TestFrameworkType.Platform)
     }
 
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
-    testImplementation(kotlin("test"))
+    testImplementation(kotlin("test-junit5"))
 }
 
 intellijPlatform {
