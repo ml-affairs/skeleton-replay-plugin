@@ -74,6 +74,28 @@ class SkeletonReplaySelectionTest {
     }
 
     @Test
+    fun returnEventsResolveCallerWhenControlReturnsToDifferentSourceContext() {
+        val focused = endpoint("/project/checkout.py", module = "checkout", function = "reserve")
+        val caller = endpoint("/project/orders.py", module = "orders", function = "main")
+        val resolver = SkeletonReplayEndpointResolver { endpoint -> endpoint.file?.startsWith("/project/") == true }
+
+        val resolved = resolver.resolve(selection(focusedEndpoint = focused, caller = caller, eventType = "return"))
+
+        assertSame(caller, resolved)
+    }
+
+    @Test
+    fun returnEventsStayOnFocusedEndpointWhenCallerIsSameSourceContext() {
+        val focused = endpoint("/project/orders.py", module = "orders", function = "main")
+        val caller = endpoint("/project/orders.py", module = "orders", function = "main")
+        val resolver = SkeletonReplayEndpointResolver { endpoint -> endpoint.file?.startsWith("/project/") == true }
+
+        val resolved = resolver.resolve(selection(focusedEndpoint = focused, caller = caller, eventType = "return"))
+
+        assertSame(focused, resolved)
+    }
+
+    @Test
     fun returnsNullWhenNoEndpointHasProjectSource() {
         val resolver = SkeletonReplayEndpointResolver { false }
 
@@ -107,14 +129,25 @@ class SkeletonReplaySelectionTest {
         assertNull(debouncer.drainLatest())
     }
 
-    private fun endpoint(file: String): SkeletonReplayEndpoint =
+    @Test
+    fun resetAllowsPreviouslyAppliedEventOrderAgain() {
+        val debouncer = SkeletonReplaySelectionDebouncer()
+        val first = selection(eventOrder = 3)
+
+        assertTrue(debouncer.submit(first))
+        assertSame(first, debouncer.drainLatest())
+        debouncer.reset()
+        assertTrue(debouncer.submit(first))
+    }
+
+    private fun endpoint(file: String, module: String = "orders", function: String = "main"): SkeletonReplayEndpoint =
         SkeletonReplayEndpoint(
-            module = "orders",
-            function = "main",
-            qualified_name = "orders.main",
+            module = module,
+            function = function,
+            qualified_name = "$module.$function",
             file = file,
             line = 12,
-            node_id = "function:orders.main",
+            node_id = "function:$module.$function",
             endpoint_type = "function",
         )
 
@@ -122,12 +155,13 @@ class SkeletonReplaySelectionTest {
         focusedEndpoint: SkeletonReplayEndpoint? = endpoint("/project/checkout.py"),
         caller: SkeletonReplayEndpoint? = null,
         eventOrder: Long = 1,
+        eventType: String = "call",
     ): SkeletonReplaySelectionPayload =
         SkeletonReplaySelectionPayload(
             schema_version = 1,
             event_index = eventOrder.toInt(),
             event_order = eventOrder,
-            event_type = "call",
+            event_type = eventType,
             focusedEndpoint = focusedEndpoint,
             caller = caller,
         )

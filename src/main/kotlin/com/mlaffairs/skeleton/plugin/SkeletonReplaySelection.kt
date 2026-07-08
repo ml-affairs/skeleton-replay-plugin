@@ -39,11 +39,29 @@ class SkeletonReplaySelectionDecoder {
 class SkeletonReplayEndpointResolver(
     private val isProjectLocal: (SkeletonReplayEndpoint) -> Boolean,
 ) {
-    fun resolve(selection: SkeletonReplaySelectionPayload): SkeletonReplayEndpoint? =
-        listOf(selection.focusedEndpoint, selection.caller)
+    fun resolve(selection: SkeletonReplaySelectionPayload): SkeletonReplayEndpoint? {
+        val focused = selection.focusedEndpoint
+        val caller = selection.caller
+        if (
+            selection.event_type == "return" &&
+            caller != null &&
+            caller.hasSource() &&
+            isProjectLocal(caller) &&
+            caller.focusKey() != focused?.focusKey()
+        ) {
+            return caller
+        }
+        return listOf(focused, caller)
             .filterNotNull()
             .firstOrNull { endpoint -> endpoint.file != null && isProjectLocal(endpoint) }
+    }
+
+    private fun SkeletonReplayEndpoint.hasSource(): Boolean = file != null
 }
+
+fun SkeletonReplayEndpoint.focusKey(): String =
+    listOf(file.orEmpty(), module.orEmpty(), class_name.orEmpty(), function.orEmpty(), qualified_name.orEmpty())
+        .joinToString("|")
 
 class SkeletonReplaySelectionDebouncer {
     private var pendingSelection: SkeletonReplaySelectionPayload? = null
@@ -65,5 +83,10 @@ class SkeletonReplaySelectionDebouncer {
         }
         lastAppliedEventOrder = latest.event_order
         return latest
+    }
+
+    fun reset() {
+        pendingSelection = null
+        lastAppliedEventOrder = null
     }
 }

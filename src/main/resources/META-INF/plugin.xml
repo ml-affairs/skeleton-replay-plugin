@@ -41,5 +41,12 @@
       <add-to-group group-id="ProjectViewPopupMenu" anchor="last" />
       <add-to-group group-id="EditorPopupMenu" anchor="last" />
     </action>
+    <action
+      id="Skeleton.LoadArtifact"
+      class="com.mlaffairs.skeleton.plugin.LoadSkeletonArtifactAction"
+      text="Load in Skeleton"
+      description="Load a Skeleton session, report, or artifact directory in the Skeleton workbench">
+      <add-to-group group-id="ProjectViewPopupMenu" anchor="last" />
+    </action>
   </actions>
 </idea-plugin>

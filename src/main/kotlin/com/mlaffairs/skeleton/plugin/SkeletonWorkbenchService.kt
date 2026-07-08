@@ -4,12 +4,14 @@ import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.wm.ToolWindowManager
+import java.nio.file.Path
 
 @Service(Service.Level.PROJECT)
 class SkeletonWorkbenchService(private val project: Project) {
     private var panel: SkeletonWorkbenchPanel? = null
     private val logBuffer = StringBuilder()
     private var loadedSession: SkeletonLoadedSession? = null
+    private var standaloneReportPath: Path? = null
     private var activeCommand: SkeletonRunCommand? = null
     private var statusText: String = "Skeleton Replay workbench ready for ${project.name}."
 
@@ -29,6 +31,7 @@ class SkeletonWorkbenchService(private val project: Project) {
     fun runStarted(command: SkeletonRunCommand) {
         logBuffer.clear()
         loadedSession = null
+        standaloneReportPath = null
         activeCommand = command
         statusText = "Running Skeleton..."
         appendLogLine("Running: ${command.commandLine.joinToString(" ")}")
@@ -51,6 +54,7 @@ class SkeletonWorkbenchService(private val project: Project) {
 
     fun sessionLoaded(session: SkeletonLoadedSession) {
         loadedSession = session
+        standaloneReportPath = null
         activeCommand = null
         statusText = if (session.manifest.target_exit_code == 0) {
             "Skeleton artifacts loaded."
@@ -59,6 +63,16 @@ class SkeletonWorkbenchService(private val project: Project) {
         }
         invokePanel {
             it.displayLoadedSession(session)
+        }
+    }
+
+    fun standaloneReportLoaded(reportPath: Path) {
+        loadedSession = null
+        standaloneReportPath = reportPath
+        activeCommand = null
+        statusText = "Standalone Skeleton report loaded."
+        invokePanel {
+            it.displayStandaloneReport(reportPath)
         }
     }
 
@@ -75,6 +89,7 @@ class SkeletonWorkbenchService(private val project: Project) {
         targetPanel.setLogText(logBuffer.toString().ifBlank { statusText })
         when {
             loadedSession != null -> targetPanel.displayLoadedSession(loadedSession!!)
+            standaloneReportPath != null -> targetPanel.displayStandaloneReport(standaloneReportPath!!)
             activeCommand != null -> targetPanel.runStarted(activeCommand!!)
             else -> targetPanel.displayStatus(statusText)
         }
