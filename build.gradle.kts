@@ -73,6 +73,5 @@ tasks {
 
     patchPluginXml {
         sinceBuild.set(providers.gradleProperty("pluginSinceBuild"))
-        untilBuild.set("")
     }
 }

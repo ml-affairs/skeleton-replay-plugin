@@ -4,7 +4,7 @@
   <vendor email="christos.hadjinikolis.subs@gmail.com" url="https://github.com/ml-affairs/skeleton">ML Affairs</vendor>
 
   <depends>com.intellij.modules.platform</depends>
-  <depends>com.intellij.modules.python</depends>
+  <depends>PythonCore</depends>
 
   <extensions defaultExtensionNs="com.intellij">
     <toolWindow

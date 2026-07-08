@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.3
+
+- Fixed Marketplace verification by omitting the empty `until-build` plugin
+  compatibility attribute from generated plugin descriptors.
+- Declared the bundled Python plugin dependency directly and moved the tool
+  window factory to Java to avoid Kotlin-generated verifier noise.
+
 ## 0.1.2
 
 - Added Follow in IDE sync from the embedded Skeleton report timeline to
