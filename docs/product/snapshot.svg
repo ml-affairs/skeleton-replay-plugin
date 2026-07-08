@@ -1,0 +1,97 @@
+<svg xmlns="http://www.w3.org/2000/svg"
+     viewBox="0 0 256 256"
+     width="256"
+     height="256"
+     fill="none">
+
+  <defs>
+    <linearGradient id="cyan" x1="66" y1="54" x2="190" y2="202" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#67E8F9"/>
+      <stop offset="100%" stop-color="#0891B2"/>
+    </linearGradient>
+
+    <linearGradient id="purple" x1="91" y1="82" x2="169" y2="178" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#A78BFA"/>
+      <stop offset="100%" stop-color="#7C3AED"/>
+    </linearGradient>
+
+    <filter id="shadow" x="-35%" y="-35%" width="170%" height="170%">
+      <feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#0F172A" flood-opacity="0.18"/>
+    </filter>
+  </defs>
+
+  <!-- capture frame -->
+  <g stroke="#111827"
+     stroke-width="10"
+     stroke-linecap="round"
+     stroke-linejoin="round">
+    <path d="M72 68 H46 V94"/>
+    <path d="M184 68 H210 V94"/>
+    <path d="M72 188 H46 V162"/>
+    <path d="M184 188 H210 V162"/>
+  </g>
+
+  <g stroke="url(#cyan)"
+     stroke-width="6"
+     stroke-linecap="round"
+     stroke-linejoin="round">
+    <path d="M72 68 H46 V94"/>
+    <path d="M184 68 H210 V94"/>
+    <path d="M72 188 H46 V162"/>
+    <path d="M184 188 H210 V162"/>
+  </g>
+
+  <!-- state document -->
+  <g filter="url(#shadow)">
+    <rect x="78"
+          y="62"
+          width="100"
+          height="132"
+          rx="18"
+          fill="#ECFEFF"
+          stroke="#111827"
+          stroke-width="8"/>
+
+    <path d="M150 62 L178 90 H156 C153 90 150 87 150 84 Z"
+          fill="url(#cyan)"
+          stroke="#111827"
+          stroke-width="8"
+          stroke-linejoin="round"/>
+  </g>
+
+  <!-- runtime state graph -->
+  <g stroke="#111827"
+     stroke-width="7"
+     stroke-linecap="round"
+     stroke-linejoin="round">
+    <path d="M104 121 H132"/>
+    <path d="M132 121 L153 105"/>
+    <path d="M132 121 L154 143"/>
+  </g>
+
+  <g stroke="url(#purple)"
+     stroke-width="4"
+     stroke-linecap="round"
+     stroke-linejoin="round">
+    <path d="M104 121 H132"/>
+    <path d="M132 121 L153 105"/>
+    <path d="M132 121 L154 143"/>
+  </g>
+
+  <g filter="url(#shadow)">
+    <circle cx="104" cy="121" r="10" fill="url(#cyan)" stroke="#111827" stroke-width="5"/>
+    <circle cx="132" cy="121" r="10" fill="url(#purple)" stroke="#111827" stroke-width="5"/>
+    <circle cx="154" cy="105" r="10" fill="url(#cyan)" stroke="#111827" stroke-width="5"/>
+    <circle cx="154" cy="143" r="10" fill="#FDBA74" stroke="#111827" stroke-width="5"/>
+  </g>
+
+  <!-- summary/state lines -->
+  <g stroke="#0F766E"
+     stroke-width="6"
+     stroke-linecap="round"
+     opacity="0.75">
+    <path d="M101 166 H155"/>
+    <path d="M101 181 H138"/>
+  </g>
+
+</svg>
