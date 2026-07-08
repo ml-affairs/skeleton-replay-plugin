@@ -7,7 +7,7 @@ import com.intellij.ui.content.ContentFactory
 
 class SkeletonToolWindowFactory : ToolWindowFactory {
     override fun createToolWindowContent(project: Project, toolWindow: ToolWindow) {
-        val workbench = SkeletonWorkbenchPanel(project)
+        val workbench = SkeletonWorkbenchService.getInstance(project).createPanel()
         val content = ContentFactory.getInstance().createContent(workbench.component, "Workbench", false)
         toolWindow.contentManager.addContent(content)
     }

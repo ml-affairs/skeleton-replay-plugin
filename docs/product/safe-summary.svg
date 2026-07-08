@@ -1,0 +1,72 @@
+<svg xmlns="http://www.w3.org/2000/svg"
+     viewBox="0 0 256 256"
+     width="256"
+     height="256"
+     fill="none">
+
+  <defs>
+    <linearGradient id="shieldFill" x1="82" y1="42" x2="178" y2="206" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#EFFFFF"/>
+      <stop offset="100%" stop-color="#BFF3F1"/>
+    </linearGradient>
+
+    <linearGradient id="teal" x1="84" y1="70" x2="178" y2="196" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#2DD4BF"/>
+      <stop offset="100%" stop-color="#0891B2"/>
+    </linearGradient>
+
+    <filter id="shadow" x="-35%" y="-35%" width="170%" height="170%">
+      <feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#0F172A" flood-opacity="0.16"/>
+    </filter>
+  </defs>
+
+  <!-- shield -->
+  <g filter="url(#shadow)">
+    <path
+      d="M128 38
+         L188 62
+         V112
+         C188 154 164 190 128 207
+         C92 190 68 154 68 112
+         V62
+         Z"
+      fill="url(#shieldFill)"
+      stroke="#111827"
+      stroke-width="8"
+      stroke-linejoin="round"/>
+  </g>
+
+  <!-- summary lines -->
+  <g stroke="#0F766E"
+     stroke-width="7"
+     stroke-linecap="round"
+     opacity="0.9">
+    <path d="M103 88 H153"/>
+    <path d="M103 111 H166"/>
+    <path d="M103 134 H139"/>
+  </g>
+
+  <!-- safe checkmark -->
+  <path
+    d="M93 154 L116 177 L166 121"
+    stroke="#111827"
+    stroke-width="15"
+    stroke-linecap="round"
+    stroke-linejoin="round"/>
+
+  <path
+    d="M93 154 L116 177 L166 121"
+    stroke="url(#teal)"
+    stroke-width="9"
+    stroke-linecap="round"
+    stroke-linejoin="round"/>
+
+  <!-- small highlight -->
+  <path
+    d="M87 70 L128 53 L169 70"
+    stroke="white"
+    stroke-width="5"
+    stroke-linecap="round"
+    opacity="0.7"/>
+
+</svg>

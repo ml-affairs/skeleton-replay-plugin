@@ -33,5 +33,13 @@
       <add-to-group group-id="ProjectViewPopupMenu" anchor="last" />
       <add-to-group group-id="EditorPopupMenu" anchor="last" />
     </action>
+    <action
+      id="Skeleton.ReplayPytestFile"
+      class="com.mlaffairs.skeleton.plugin.ReplayPytestFileAction"
+      text="Replay Pytest File with Skeleton"
+      description="Run the selected pytest file through Skeleton Replay">
+      <add-to-group group-id="ProjectViewPopupMenu" anchor="last" />
+      <add-to-group group-id="EditorPopupMenu" anchor="last" />
+    </action>
   </actions>
 </idea-plugin>

@@ -1,4 +1,4 @@
-<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Skeleton skull inside code braces">
+<svg width="40" height="40" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Skeleton skull inside code braces">
   <defs>
     <linearGradient id="bone" x1="120" y1="60" x2="390" y2="430" gradientUnits="userSpaceOnUse">
       <stop offset="0" stop-color="#ffffff"/>
@@ -19,12 +19,10 @@
     </filter>
   </defs>
   <rect width="512" height="512" rx="96" fill="#080812"/>
-  <!-- Braces -->
   <g fill="none" stroke="url(#brace)" stroke-width="26" stroke-linecap="round" stroke-linejoin="round" filter="url(#glow)">
     <path d="M150 110H115C93 110 82 126 82 148V207C82 231 65 244 45 244C65 244 82 257 82 281V364C82 386 93 402 115 402H150"/>
     <path d="M362 110H397C419 110 430 126 430 148V207C430 231 447 244 467 244C447 244 430 257 430 281V364C430 386 419 402 397 402H362"/>
   </g>
-  <!-- Skull -->
   <g filter="url(#glow)">
     <path
       d="M256 92
@@ -42,10 +40,8 @@
       stroke-width="6"
       stroke-linejoin="round"
     />
-    <!-- Eye sockets -->
     <ellipse cx="210" cy="244" rx="45" ry="52" fill="#070711"/>
     <ellipse cx="302" cy="244" rx="45" ry="52" fill="#070711"/>
-    <!-- Nose -->
     <path
       d="M256 278
          C242 298 232 322 235 340
@@ -54,10 +50,8 @@
          C280 322 270 298 256 278Z"
       fill="#070711"
     />
-    <!-- Cheek shadows -->
     <path d="M173 302 C199 317 201 350 180 365" fill="none" stroke="#8f83b8" stroke-width="8" stroke-linecap="round" opacity="0.45"/>
     <path d="M339 302 C313 317 311 350 332 365" fill="none" stroke="#8f83b8" stroke-width="8" stroke-linecap="round" opacity="0.45"/>
-    <!-- Teeth -->
     <g fill="#f8f7ff" stroke="#6f668f" stroke-width="3">
       <rect x="212" y="358" width="16" height="40" rx="8"/>
       <rect x="230" y="354" width="17" height="45" rx="8"/>
@@ -65,17 +59,10 @@
       <rect x="268" y="354" width="17" height="45" rx="8"/>
       <rect x="286" y="358" width="16" height="40" rx="8"/>
     </g>
-    <!-- Cracks -->
     <g fill="none" stroke="#1c1b2f" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
       <path d="M195 146 L184 176 L197 194 L190 218"/>
       <path d="M318 145 L332 172 L324 192 L337 214"/>
       <path d="M286 118 L297 143 L292 163"/>
     </g>
   </g>
-  <!-- Tiny token label -->
-  <text x="256" y="462" text-anchor="middle"
-        font-family="Inter, ui-sans-serif, system-ui, sans-serif"
-        font-size="24" font-weight="700"
-        fill="#c4b5fd">
-  </text>
 </svg>
