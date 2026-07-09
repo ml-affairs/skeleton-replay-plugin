@@ -40,7 +40,7 @@ intellijPlatform {
         id = "com.mlaffairs.skeleton"
         name = "Skeleton Replay"
         version = providers.gradleProperty("pluginVersion")
-        description = providers.fileContents(layout.projectDirectory.file("README.md")).asText.map(::markdownToHTML)
+        description = providers.fileContents(layout.projectDirectory.file("docs/marketplace-description.md")).asText.map(::markdownToHTML)
         changeNotes = providers.fileContents(layout.projectDirectory.file("CHANGELOG.md")).asText.map(::markdownToHTML)
 
         ideaVersion {

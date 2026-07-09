@@ -7,6 +7,16 @@ does not trace Python code itself. It uses the project's configured Python
 interpreter, invokes the installed `skeleton` CLI, reads `session.json`, and
 renders the linked artifacts inside PyCharm.
 
+## Getting Started
+
+1. Install the `skeleton-replay` Python package in your project environment.
+2. Open a Python project in PyCharm.
+3. Open the Skeleton tool window.
+4. Run `Replay with Skeleton` from a Python file, or load an existing
+   `session.json` or `report.html` artifact.
+5. Use `Follow in IDE` to synchronize report timeline selections with the
+   editor and Project view.
+
 ## First Workbench
 
 - Tool Window with Report, Workflow, Artifacts, Quality, and Log tabs.
@@ -63,6 +73,12 @@ PRIVATE_KEY
 PRIVATE_KEY_PASSWORD
 PUBLISH_TOKEN
 ```
+
+## Marketplace
+
+- Documentation: https://github.com/ml-affairs/skeleton-replay-plugin#readme
+- Bug tracker: https://github.com/ml-affairs/skeleton-replay-plugin/issues
+- Privacy policy: https://github.com/ml-affairs/skeleton-replay-plugin/blob/main/PRIVACY.md
 
 ## Engine Contract
 
