@@ -15,10 +15,9 @@ import com.intellij.openapi.roots.ProjectFileIndex
 import com.intellij.openapi.util.TextRange
 import com.intellij.openapi.vfs.VfsUtil
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiDocumentManager
-import com.intellij.psi.util.PsiTreeUtil
 import com.intellij.util.Alarm
-import com.jetbrains.python.psi.PyFunction
 import java.nio.file.InvalidPathException
 import java.nio.file.Path
 import kotlin.math.max
@@ -30,14 +29,27 @@ class SkeletonIdeNavigationService(private val project: Project) {
     private val alarm = Alarm(Alarm.ThreadToUse.SWING_THREAD, project)
     private var followEnabled = true
     private var activeHighlight: RangeHighlighter? = null
+    private var lastActivatedFocusKey: String? = null
 
     fun isFollowEnabled(): Boolean = followEnabled
 
     fun setFollowEnabled(enabled: Boolean) {
         followEnabled = enabled
-        if (!enabled) {
+        if (enabled) {
+            lastActivatedFocusKey = null
+            debouncer.reset()
+        } else {
             alarm.cancelAllRequests()
+            clearHighlight()
         }
+    }
+
+    fun disengage() {
+        followEnabled = false
+        alarm.cancelAllRequests()
+        debouncer.reset()
+        lastActivatedFocusKey = null
+        clearHighlight()
     }
 
     fun consumeBridgePayload(payloadJson: String) {
@@ -58,6 +70,11 @@ class SkeletonIdeNavigationService(private val project: Project) {
         }
         val selection = debouncer.drainLatest() ?: return
         val endpoint = SkeletonReplayEndpointResolver(::hasProjectLocalSourceFile).resolve(selection) ?: return
+        val focusKey = endpoint.focusKey()
+        if (focusKey == lastActivatedFocusKey) {
+            return
+        }
+        lastActivatedFocusKey = focusKey
         navigateTo(endpoint)
     }
 
@@ -83,10 +100,7 @@ class SkeletonIdeNavigationService(private val project: Project) {
     }
 
     private fun highlightEndpoint(editor: Editor, virtualFile: VirtualFile, lineIndex: Int) {
-        activeHighlight?.let { oldHighlight ->
-            runCatching { oldHighlight.dispose() }
-        }
-        activeHighlight = null
+        clearHighlight()
 
         val document = editor.document
         if (document.lineCount == 0) {
@@ -100,7 +114,7 @@ class SkeletonIdeNavigationService(private val project: Project) {
             ?: com.intellij.psi.PsiManager.getInstance(project).findFile(virtualFile)
         val highlightRange = psiFile
             ?.findElementAt(lineStart.coerceAtMost(max(0, document.textLength - 1)))
-            ?.let { element -> PsiTreeUtil.getParentOfType(element, PyFunction::class.java, false) }
+            ?.let(::findPythonFunctionParent)
             ?.textRange
             ?.takeIf { range -> range.startOffset < range.endOffset }
             ?: TextRange(lineStart, lineEnd)
@@ -116,6 +130,20 @@ class SkeletonIdeNavigationService(private val project: Project) {
             HighlighterTargetArea.EXACT_RANGE,
         )
     }
+
+    private fun clearHighlight() {
+        activeHighlight?.let { oldHighlight ->
+            runCatching { oldHighlight.dispose() }
+        }
+        activeHighlight = null
+    }
+
+    private fun findPythonFunctionParent(element: PsiElement): PsiElement? =
+        generateSequence(element) { current -> current.parent }
+            .firstOrNull { current ->
+                current.javaClass.name.startsWith("com.jetbrains.python.psi.") &&
+                    current.javaClass.simpleName.contains("PyFunction")
+            }
 
     companion object {
         private const val NAVIGATION_DEBOUNCE_MS = 120

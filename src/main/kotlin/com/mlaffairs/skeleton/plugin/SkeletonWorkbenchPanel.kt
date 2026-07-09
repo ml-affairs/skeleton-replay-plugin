@@ -1,8 +1,11 @@
 package com.mlaffairs.skeleton.plugin
 
 import com.intellij.ide.BrowserUtil
+import com.intellij.openapi.fileChooser.FileChooser
+import com.intellij.openapi.fileChooser.FileChooserDescriptor
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.Messages
+import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.ui.components.JBLabel
 import com.intellij.ui.components.JBScrollPane
 import com.intellij.ui.jcef.JBCefApp
@@ -15,21 +18,23 @@ import java.nio.file.Path
 import javax.swing.JButton
 import javax.swing.JCheckBox
 import javax.swing.JComponent
-import javax.swing.JFileChooser
+import javax.swing.JEditorPane
 import javax.swing.JPanel
 import javax.swing.JTabbedPane
 import javax.swing.JTextArea
 import javax.swing.TransferHandler
+import javax.swing.event.HyperlinkEvent
 
 class SkeletonWorkbenchPanel(private val project: Project) {
     val component: JComponent = JPanel(BorderLayout())
 
     private val reportPanel = JPanel(BorderLayout())
     private val tabs = JTabbedPane()
-    private val workflowText = readOnlyTextArea("Run Skeleton to load workflow.md")
-    private val artifactsText = readOnlyTextArea("No session.json loaded")
-    private val qualityText = readOnlyTextArea("Run Skeleton to load architecture_quality.md")
+    private val workflowText = richTextPane("Run Skeleton to load workflow.md")
+    private val artifactsText = richTextPane("No session.json loaded")
+    private val qualityText = richTextPane("Run Skeleton to load architecture_quality.md")
     private val logText = readOnlyTextArea("Skeleton Replay workbench ready for ${project.name}.")
+    private val followInIde = JCheckBox("Follow in IDE", SkeletonIdeNavigationService.getInstance(project).isFollowEnabled())
     private var reportBrowser: JBCefBrowser? = null
     private var reportBridge: SkeletonReportBridge? = null
 
@@ -48,20 +53,38 @@ class SkeletonWorkbenchPanel(private val project: Project) {
     }
 
     fun runStarted(command: SkeletonRunCommand) {
-        workflowText.text = "Skeleton is running. Workflow will load from ${command.outputDirectory.resolve("workflow.md")}."
-        artifactsText.text = "Waiting for ${command.sessionPath}."
-        qualityText.text = "Skeleton is running. Quality report will load from ${command.outputDirectory.resolve("architecture_quality.md")}."
+        workflowText.text = htmlPage("Workflow", "Skeleton is running. Workflow will load from ${command.outputDirectory.resolve("workflow.md")}.")
+        artifactsText.text = htmlPage("Artifacts", "Waiting for ${command.sessionPath}.")
+        qualityText.text = htmlPage("Quality", "Skeleton is running. Quality report will load from ${command.outputDirectory.resolve("architecture_quality.md")}.")
         showReportPlaceholder("Skeleton is running. Report will load when report.html is available.")
     }
 
     fun displayLoadedSession(session: SkeletonLoadedSession) {
-        workflowText.text = session.workflowText ?: "workflow.md was not found at ${session.manifest.artifacts.workflow}."
+        workflowText.text = markdownHtml("Workflow", session.workflowText ?: "workflow.md was not found at ${session.manifest.artifacts.workflow}.")
         workflowText.caretPosition = 0
-        qualityText.text = session.qualityMarkdownText ?: "architecture_quality.md was not found at ${session.manifest.artifacts.quality_markdown}."
+        qualityText.text = markdownHtml("Quality", session.qualityMarkdownText ?: "architecture_quality.md was not found at ${session.manifest.artifacts.quality_markdown}.")
         qualityText.caretPosition = 0
-        artifactsText.text = session.artifactsText
+        artifactsText.text = artifactsHtml(session)
         artifactsText.caretPosition = 0
         displayReport(session.reportPath, session.manifest.artifacts.report)
+    }
+
+    fun displayStandaloneReport(reportPath: Path) {
+        workflowText.text = htmlPage("Workflow", "No session.json was loaded, so workflow.md is not available for this standalone report.")
+        qualityText.text = htmlPage("Quality", "No session.json was loaded, so architecture_quality.md is not available for this standalone report.")
+        artifactsText.text = htmlPage(
+            "Artifacts",
+            """
+            <div class="summary"><span class="warn">standalone report</span></div>
+            <p>Loaded <a href="${escapeHtml(reportPath.toUri().toString())}">${escapeHtml(reportPath.toString())}</a>.</p>
+            <p>Drop or load the matching <code>session.json</code> to populate Workflow, Quality, and artifact metadata.</p>
+            """.trimIndent(),
+            rawBody = true,
+        )
+        workflowText.caretPosition = 0
+        qualityText.caretPosition = 0
+        artifactsText.caretPosition = 0
+        displayReport(reportPath, reportPath.toString())
     }
 
     fun displayStatus(message: String) {
@@ -126,18 +149,15 @@ class SkeletonWorkbenchPanel(private val project: Project) {
     private fun toolbar(): JComponent =
         JPanel(FlowLayout(FlowLayout.LEFT, 8, 6)).apply {
             border = JBUI.Borders.emptyLeft(4)
-            add(JButton("Load session.json").apply {
+            add(JButton("Load Artifact...").apply {
                 addActionListener { chooseAndLoadSession() }
             })
-            add(followToggle())
+            add(followInIde.apply {
+                addActionListener {
+                    SkeletonIdeNavigationService.getInstance(project).setFollowEnabled(isSelected)
+                }
+            })
             add(JBLabel("Drop session.json, report.html, or an artifact folder here."))
-        }
-
-    private fun followToggle(): JCheckBox =
-        JCheckBox("Follow in IDE", SkeletonIdeNavigationService.getInstance(project).isFollowEnabled()).apply {
-            addActionListener {
-                SkeletonIdeNavigationService.getInstance(project).setFollowEnabled(isSelected)
-            }
         }
 
     private fun ensureReportBridge(browser: JBCefBrowser) {
@@ -150,27 +170,44 @@ class SkeletonWorkbenchPanel(private val project: Project) {
     }
 
     private fun chooseAndLoadSession() {
-        val chooser = JFileChooser().apply {
-            dialogTitle = "Load Skeleton session.json"
-            fileSelectionMode = JFileChooser.FILES_AND_DIRECTORIES
+        val descriptor = FileChooserDescriptor(true, true, false, false, false, false).apply {
+            title = "Load Skeleton Artifact"
+            description = "Choose session.json, report.html, or an artifact directory."
         }
-        if (chooser.showOpenDialog(component) == JFileChooser.APPROVE_OPTION) {
-            SkeletonRunnerService.getInstance(project).loadExistingArtifact(chooser.selectedFile.toPath())
+        val initialFile = initialChooserPath()?.let { LocalFileSystem.getInstance().refreshAndFindFileByPath(it.toString()) }
+        FileChooser.chooseFile(descriptor, project, initialFile) { selectedFile ->
+            SkeletonRunnerService.getInstance(project).loadExistingArtifact(Path.of(selectedFile.path))
         }
+    }
+
+    private fun initialChooserPath(): Path? {
+        val projectRoot = project.basePath?.let { Path.of(it) } ?: return null
+        return projectRoot
     }
 
     private fun installDropTarget(target: JComponent) {
         target.transferHandler = object : TransferHandler() {
             override fun canImport(support: TransferSupport): Boolean =
-                support.isDataFlavorSupported(DataFlavor.javaFileListFlavor)
+                support.isDataFlavorSupported(DataFlavor.javaFileListFlavor) ||
+                    support.isDataFlavorSupported(DataFlavor.stringFlavor)
 
             override fun importData(support: TransferSupport): Boolean {
                 if (!canImport(support)) {
                     return false
                 }
-                val files = support.transferable.getTransferData(DataFlavor.javaFileListFlavor) as? List<*> ?: return false
-                val firstFile = files.firstOrNull() as? java.io.File ?: return false
-                SkeletonRunnerService.getInstance(project).loadExistingArtifact(firstFile.toPath())
+                val transferable = support.transferable
+                if (support.isDataFlavorSupported(DataFlavor.javaFileListFlavor)) {
+                    val files = transferable.getTransferData(DataFlavor.javaFileListFlavor) as? List<*> ?: return false
+                    val firstFile = files.firstOrNull() as? java.io.File ?: return false
+                    SkeletonRunnerService.getInstance(project).loadExistingArtifact(firstFile.toPath())
+                    return true
+                }
+                val text = transferable.getTransferData(DataFlavor.stringFlavor) as? String ?: return false
+                val firstPath = text.lineSequence()
+                    .map { it.trim() }
+                    .firstOrNull { it.isNotEmpty() }
+                    ?: return false
+                SkeletonRunnerService.getInstance(project).loadExistingArtifact(firstPath)
                 return true
             }
         }
@@ -182,9 +219,102 @@ class SkeletonWorkbenchPanel(private val project: Project) {
             lineWrap = false
         }
 
+    private fun richTextPane(text: String): JEditorPane =
+        JEditorPane("text/html", htmlPage("Skeleton", text)).apply {
+            isEditable = false
+            addHyperlinkListener { event ->
+                if (event.eventType == HyperlinkEvent.EventType.ACTIVATED && event.url != null) {
+                    BrowserUtil.browse(event.url)
+                }
+            }
+        }
+
     private fun centerLabel(text: String): JComponent =
         JPanel(BorderLayout()).apply {
             border = JBUI.Borders.empty(12)
             add(JBLabel(text), BorderLayout.CENTER)
         }
+
+    private fun artifactsHtml(session: SkeletonLoadedSession): String {
+        val manifest = session.manifest
+        val statusClass = if (manifest.target_exit_code == 0) "ok" else "warn"
+        val rows = listOf(
+            "session" to manifest.artifacts.session,
+            "trace" to manifest.artifacts.trace,
+            "snapshot" to manifest.artifacts.snapshot,
+            "workflow" to manifest.artifacts.workflow,
+            "quality" to manifest.artifacts.quality,
+            "quality markdown" to manifest.artifacts.quality_markdown,
+            "report" to (manifest.artifacts.report ?: "not generated"),
+        ).joinToString("") { (label, path) ->
+            val value = if (path == "not generated") {
+                path
+            } else {
+                """<a href="${escapeHtml(fileUri(path))}">${escapeHtml(path)}</a>"""
+            }
+            "<tr><th>${escapeHtml(label)}</th><td>$value</td></tr>"
+        }
+        return htmlPage(
+            "Artifacts",
+            """
+            <p><b>${statusLabel(statusClass)}:</b> target exit ${manifest.target_exit_code} &nbsp; ${manifest.metrics.events} events &nbsp; ${manifest.metrics.nodes} nodes &nbsp; ${manifest.metrics.edges} edges</p>
+            <h3>Run</h3>
+            <table>
+              <tr><th>Skeleton</th><td>${escapeHtml(manifest.skeleton_version)}</td></tr>
+              <tr><th>Command</th><td><code>${escapeHtml(manifest.command)}</code></td></tr>
+              <tr><th>Project root</th><td>${escapeHtml(manifest.project_root)}</td></tr>
+              <tr><th>Target</th><td>${escapeHtml(manifest.target.kind)} ${escapeHtml(manifest.target.path ?: "")}</td></tr>
+              <tr><th>Error</th><td>${escapeHtml(manifest.target_error ?: "none")}</td></tr>
+            </table>
+            <h3>Files</h3>
+            <table>$rows</table>
+            """.trimIndent(),
+            rawBody = true,
+        )
+    }
+
+    private fun markdownHtml(title: String, markdown: String): String {
+        val body = markdown.lines().joinToString("\n") { line ->
+            val trimmed = line.trim()
+            when {
+                trimmed.startsWith("### ") -> "<h3>${escapeHtml(trimmed.removePrefix("### "))}</h3>"
+                trimmed.startsWith("## ") -> "<h2>${escapeHtml(trimmed.removePrefix("## "))}</h2>"
+                trimmed.startsWith("# ") -> "<h1>${escapeHtml(trimmed.removePrefix("# "))}</h1>"
+                trimmed.startsWith("- ") -> "<p>&bull; ${highlightTerms(escapeHtml(trimmed.removePrefix("- ")))}</p>"
+                trimmed.startsWith("* ") -> "<p>&bull; ${highlightTerms(escapeHtml(trimmed.removePrefix("* ")))}</p>"
+                trimmed.isEmpty() -> "<br/>"
+                else -> "<p>${highlightTerms(escapeHtml(trimmed))}</p>"
+            }
+        }
+        return htmlPage(title, body, rawBody = true)
+    }
+
+    private fun htmlPage(title: String, body: String, rawBody: Boolean = false): String {
+        val safeBody = if (rawBody) body else "<p>${escapeHtml(body)}</p>"
+        return """
+            <html>
+            <body>
+              <h2>${escapeHtml(title)}</h2>
+              $safeBody
+            </body>
+            </html>
+        """.trimIndent()
+    }
+
+    private fun highlightTerms(text: String): String =
+        text.replace(Regex("\\b(warning|risk|error|failed|failure|coupling|boundary|entrypoint|service|repository|adapter|module|method|return)\\b", RegexOption.IGNORE_CASE)) {
+            "<b>${it.value}</b>"
+        }
+
+    private fun statusLabel(statusClass: String): String =
+        if (statusClass == "ok") "OK" else "Warning"
+
+    private fun fileUri(path: String): String =
+        runCatching { Path.of(path).toUri().toString() }.getOrDefault(path)
+
+    private fun escapeHtml(value: String): String =
+        value.replace("&", "&amp;")
+            .replace("<", "&lt;")
+            .replace(">", "&gt;")
+            .replace("\"", "&quot;")
 }
