@@ -2,6 +2,7 @@ package com.mlaffairs.skeleton.plugin
 
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.ui.jcef.JBCefBrowser
+import com.intellij.ui.jcef.JBCefBrowserBase
 import com.intellij.ui.jcef.JBCefJSQuery
 import org.cef.browser.CefBrowser
 import org.cef.browser.CefFrame
@@ -11,7 +12,7 @@ class SkeletonReportBridge(
     private val browser: JBCefBrowser,
     private val onSelectionPayload: (String) -> Unit,
 ) {
-    private val query = JBCefJSQuery.create(browser)
+    private val query = JBCefJSQuery.create(browser as JBCefBrowserBase)
     private var installed = false
 
     fun install() {

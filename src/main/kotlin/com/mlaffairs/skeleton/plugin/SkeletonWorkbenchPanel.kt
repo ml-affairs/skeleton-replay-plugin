@@ -39,7 +39,7 @@ class SkeletonWorkbenchPanel(private val project: Project) {
     private var reportBridge: SkeletonReportBridge? = null
 
     init {
-        reportPanel.add(centerLabel("Run Skeleton to load report.html"), BorderLayout.CENTER)
+        reportPanel.add(SkeletonStartupReportPanel.scanning(), BorderLayout.CENTER)
         tabs.addTab("Report", reportPanel)
         tabs.addTab("Workflow", JBScrollPane(workflowText))
         tabs.addTab("Artifacts", JBScrollPane(artifactsText))
@@ -53,6 +53,7 @@ class SkeletonWorkbenchPanel(private val project: Project) {
     }
 
     fun runStarted(command: SkeletonRunCommand) {
+        SkeletonIdeNavigationService.getInstance(project).clearTraceIndex()
         workflowText.text = htmlPage("Workflow", "Skeleton is running. Workflow will load from ${command.outputDirectory.resolve("workflow.md")}.")
         artifactsText.text = htmlPage("Artifacts", "Waiting for ${command.sessionPath}.")
         qualityText.text = htmlPage("Quality", "Skeleton is running. Quality report will load from ${command.outputDirectory.resolve("architecture_quality.md")}.")
@@ -60,6 +61,7 @@ class SkeletonWorkbenchPanel(private val project: Project) {
     }
 
     fun displayLoadedSession(session: SkeletonLoadedSession) {
+        SkeletonIdeNavigationService.getInstance(project).setTraceIndex(session.traceIndex)
         workflowText.text = markdownHtml("Workflow", session.workflowText ?: "workflow.md was not found at ${session.manifest.artifacts.workflow}.")
         workflowText.caretPosition = 0
         qualityText.text = markdownHtml("Quality", session.qualityMarkdownText ?: "architecture_quality.md was not found at ${session.manifest.artifacts.quality_markdown}.")
@@ -69,7 +71,35 @@ class SkeletonWorkbenchPanel(private val project: Project) {
         displayReport(session.reportPath, session.manifest.artifacts.report)
     }
 
+    fun displayStartupScanning() {
+        SkeletonIdeNavigationService.getInstance(project).clearTraceIndex()
+        resetArtifactTabs()
+        reportPanel.removeAll()
+        reportPanel.add(SkeletonStartupReportPanel.scanning(), BorderLayout.CENTER)
+        reportPanel.revalidate()
+        reportPanel.repaint()
+    }
+
+    fun displayStartupReports(reports: List<SkeletonDiscoveredReport>) {
+        SkeletonIdeNavigationService.getInstance(project).clearTraceIndex()
+        resetArtifactTabs()
+        reportPanel.removeAll()
+        reportPanel.add(
+            SkeletonStartupReportPanel.startScreen(
+                reports = reports,
+                onManualLoad = { chooseAndLoadSession() },
+                onRescan = { SkeletonWorkbenchService.getInstance(project).rescanStartupReports() },
+                onPyPi = { BrowserUtil.browse("https://pypi.org/project/skeleton-replay/") },
+                onLoadSession = { sessionPath -> SkeletonRunnerService.getInstance(project).loadExistingArtifact(sessionPath) },
+            ),
+            BorderLayout.CENTER,
+        )
+        reportPanel.revalidate()
+        reportPanel.repaint()
+    }
+
     fun displayStandaloneReport(reportPath: Path) {
+        SkeletonIdeNavigationService.getInstance(project).clearTraceIndex()
         workflowText.text = htmlPage("Workflow", "No session.json was loaded, so workflow.md is not available for this standalone report.")
         qualityText.text = htmlPage("Quality", "No session.json was loaded, so architecture_quality.md is not available for this standalone report.")
         artifactsText.text = htmlPage(
@@ -88,10 +118,12 @@ class SkeletonWorkbenchPanel(private val project: Project) {
     }
 
     fun displayStatus(message: String) {
+        SkeletonIdeNavigationService.getInstance(project).clearTraceIndex()
         showReportPlaceholder(message)
     }
 
     fun displayError(message: String) {
+        SkeletonIdeNavigationService.getInstance(project).clearTraceIndex()
         showReportPlaceholder(message)
         Messages.showErrorDialog(project, message, "Skeleton Replay")
     }
@@ -152,6 +184,9 @@ class SkeletonWorkbenchPanel(private val project: Project) {
             add(JButton("Load Artifact...").apply {
                 addActionListener { chooseAndLoadSession() }
             })
+            add(JButton("Unload").apply {
+                addActionListener { SkeletonWorkbenchService.getInstance(project).unloadArtifact() }
+            })
             add(followInIde.apply {
                 addActionListener {
                     SkeletonIdeNavigationService.getInstance(project).setFollowEnabled(isSelected)
@@ -178,6 +213,15 @@ class SkeletonWorkbenchPanel(private val project: Project) {
         FileChooser.chooseFile(descriptor, project, initialFile) { selectedFile ->
             SkeletonRunnerService.getInstance(project).loadExistingArtifact(Path.of(selectedFile.path))
         }
+    }
+
+    private fun resetArtifactTabs() {
+        workflowText.text = htmlPage("Workflow", "Load a Skeleton session to view workflow.md.")
+        artifactsText.text = htmlPage("Artifacts", "No session.json loaded.")
+        qualityText.text = htmlPage("Quality", "Load a Skeleton session to view architecture_quality.md.")
+        workflowText.caretPosition = 0
+        artifactsText.caretPosition = 0
+        qualityText.caretPosition = 0
     }
 
     private fun initialChooserPath(): Path? {

@@ -3,11 +3,14 @@ package com.mlaffairs.skeleton.plugin
 import com.intellij.ide.projectView.ProjectView
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.editor.Editor
+import com.intellij.openapi.editor.EditorCustomElementRenderer
+import com.intellij.openapi.editor.Inlay
 import com.intellij.openapi.editor.colors.EditorColors
 import com.intellij.openapi.editor.colors.EditorColorsManager
 import com.intellij.openapi.editor.markup.HighlighterLayer
 import com.intellij.openapi.editor.markup.RangeHighlighter
 import com.intellij.openapi.editor.markup.HighlighterTargetArea
+import com.intellij.openapi.editor.markup.TextAttributes
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.fileEditor.OpenFileDescriptor
 import com.intellij.openapi.project.Project
@@ -18,6 +21,10 @@ import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiDocumentManager
 import com.intellij.util.Alarm
+import java.awt.Color
+import java.awt.Font
+import java.awt.Graphics
+import java.awt.Rectangle
 import java.nio.file.InvalidPathException
 import java.nio.file.Path
 import kotlin.math.max
@@ -29,9 +36,22 @@ class SkeletonIdeNavigationService(private val project: Project) {
     private val alarm = Alarm(Alarm.ThreadToUse.SWING_THREAD, project)
     private var followEnabled = true
     private var activeHighlight: RangeHighlighter? = null
+    private var activeInlay: Inlay<*>? = null
     private var lastActivatedFocusKey: String? = null
+    private var traceIndex: SkeletonTraceIndex = SkeletonTraceIndex.EMPTY
 
     fun isFollowEnabled(): Boolean = followEnabled
+
+    fun setTraceIndex(traceIndex: SkeletonTraceIndex) {
+        this.traceIndex = traceIndex
+        debouncer.reset()
+        lastActivatedFocusKey = null
+        clearHighlight()
+    }
+
+    fun clearTraceIndex() {
+        setTraceIndex(SkeletonTraceIndex.EMPTY)
+    }
 
     fun setFollowEnabled(enabled: Boolean) {
         followEnabled = enabled
@@ -69,13 +89,13 @@ class SkeletonIdeNavigationService(private val project: Project) {
             return
         }
         val selection = debouncer.drainLatest() ?: return
-        val endpoint = SkeletonReplayEndpointResolver(::hasProjectLocalSourceFile).resolve(selection) ?: return
+        val endpoint = traceIndex.eventFor(selection)?.callee
+            ?.takeIf { candidate -> candidate.file != null && hasProjectLocalSourceFile(candidate) }
+            ?: SkeletonReplayEndpointResolver(::hasProjectLocalSourceFile).resolve(selection)
+            ?: return
         val focusKey = endpoint.focusKey()
-        if (focusKey == lastActivatedFocusKey) {
-            return
-        }
         lastActivatedFocusKey = focusKey
-        navigateTo(endpoint)
+        navigateTo(endpoint, SkeletonTraceInlayFormatter.textForSelection(selection, traceIndex))
     }
 
     private fun hasProjectLocalSourceFile(endpoint: SkeletonReplayEndpoint): Boolean =
@@ -91,15 +111,15 @@ class SkeletonIdeNavigationService(private val project: Project) {
         return virtualFile.takeIf { ProjectFileIndex.getInstance(project).isInContent(it) }
     }
 
-    private fun navigateTo(endpoint: SkeletonReplayEndpoint) {
+    private fun navigateTo(endpoint: SkeletonReplayEndpoint, inlayText: String?) {
         val virtualFile = endpoint.file?.let(::findProjectLocalFile) ?: return
         ProjectView.getInstance(project).select(null, virtualFile, false)
         val lineIndex = max(0, (endpoint.line ?: 1) - 1)
         val editor = FileEditorManager.getInstance(project).openTextEditor(OpenFileDescriptor(project, virtualFile, lineIndex, 0), true) ?: return
-        highlightEndpoint(editor, virtualFile, lineIndex)
+        highlightEndpoint(editor, virtualFile, lineIndex, endpoint.callable_kind, inlayText)
     }
 
-    private fun highlightEndpoint(editor: Editor, virtualFile: VirtualFile, lineIndex: Int) {
+    private fun highlightEndpoint(editor: Editor, virtualFile: VirtualFile, lineIndex: Int, callableKind: String?, inlayText: String?) {
         clearHighlight()
 
         val document = editor.document
@@ -119,9 +139,7 @@ class SkeletonIdeNavigationService(private val project: Project) {
             ?.takeIf { range -> range.startOffset < range.endOffset }
             ?: TextRange(lineStart, lineEnd)
 
-        val attributes = EditorColorsManager.getInstance()
-            .globalScheme
-            .getAttributes(EditorColors.SEARCH_RESULT_ATTRIBUTES)
+        val attributes = highlightAttributes(callableKind)
         activeHighlight = editor.markupModel.addRangeHighlighter(
             highlightRange.startOffset,
             highlightRange.endOffset,
@@ -129,6 +147,13 @@ class SkeletonIdeNavigationService(private val project: Project) {
             attributes,
             HighlighterTargetArea.EXACT_RANGE,
         )
+        if (inlayText != null) {
+            activeInlay = editor.inlayModel.addAfterLineEndElement(
+                lineEnd,
+                true,
+                SkeletonTraceInlayRenderer(inlayText, callableKind),
+            )
+        }
     }
 
     private fun clearHighlight() {
@@ -136,6 +161,10 @@ class SkeletonIdeNavigationService(private val project: Project) {
             runCatching { oldHighlight.dispose() }
         }
         activeHighlight = null
+        activeInlay?.let { oldInlay ->
+            runCatching { oldInlay.dispose() }
+        }
+        activeInlay = null
     }
 
     private fun findPythonFunctionParent(element: PsiElement): PsiElement? =
@@ -151,3 +180,49 @@ class SkeletonIdeNavigationService(private val project: Project) {
         fun getInstance(project: Project): SkeletonIdeNavigationService = project.getService(SkeletonIdeNavigationService::class.java)
     }
 }
+
+private class SkeletonTraceInlayRenderer(
+    private val text: String,
+    callableKind: String?,
+) : EditorCustomElementRenderer {
+    private val accent = callableKind.accentColor()
+
+    override fun calcWidthInPixels(inlay: Inlay<*>): Int {
+        val font = inlay.editor.colorsScheme.getFont(com.intellij.openapi.editor.colors.EditorFontType.PLAIN)
+        return inlay.editor.contentComponent.getFontMetrics(font).stringWidth(text) + 18
+    }
+
+    override fun paint(inlay: Inlay<*>, graphics: Graphics, targetRegion: Rectangle, textAttributes: TextAttributes) {
+        val copy = graphics.create()
+        try {
+            copy.font = inlay.editor.colorsScheme.getFont(com.intellij.openapi.editor.colors.EditorFontType.PLAIN).deriveFont(Font.PLAIN)
+            copy.color = accent
+            copy.fillRect(targetRegion.x + 4, targetRegion.y + 3, 2, max(1, targetRegion.height - 6))
+            copy.color = INLAY_GREY
+            copy.drawString(text, targetRegion.x + 10, targetRegion.y + inlay.editor.ascent)
+        } finally {
+            copy.dispose()
+        }
+    }
+}
+
+private fun highlightAttributes(callableKind: String?): TextAttributes =
+    TextAttributes(
+        null,
+        callableKind.accentColor(52),
+        callableKind.accentColor(),
+        null,
+        Font.PLAIN,
+    ).takeUnless { callableKind == null }
+        ?: EditorColorsManager.getInstance().globalScheme.getAttributes(EditorColors.SEARCH_RESULT_ATTRIBUTES)
+
+private fun String?.accentColor(alpha: Int = 255): Color =
+    when (this) {
+        "instance_method" -> Color(245, 158, 11, alpha)
+        "class_method" -> Color(249, 115, 22, alpha)
+        "static_method" -> Color(234, 179, 8, alpha)
+        "module_function" -> Color(34, 197, 94, alpha)
+        else -> Color(56, 220, 226, alpha)
+    }
+
+private val INLAY_GREY = Color(128, 139, 152)

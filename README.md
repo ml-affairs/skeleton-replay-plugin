@@ -11,7 +11,9 @@ renders the linked artifacts inside PyCharm.
 
 1. Install the `skeleton-replay` Python package in your project environment.
 2. Open a Python project in PyCharm.
-3. Open the Skeleton tool window.
+3. Open the Skeleton tool window. It automatically scans the project for
+   existing Skeleton reports under `tests/**/.skeleton/**/session.json` and the
+   project-root `.skeleton` directory.
 4. Run `Replay with Skeleton` from a Python file, or load an existing
    `session.json` or `report.html` artifact.
 5. Use `Follow in IDE` to synchronize report timeline selections with the
@@ -20,6 +22,9 @@ renders the linked artifacts inside PyCharm.
 ## First Workbench
 
 - Tool Window with Report, Workflow, Artifacts, Quality, and Log tabs.
+- Startup discovery for existing Skeleton reports, with clickable report choices,
+  project-relative labels, a manual rescan button, an unload action, and
+  first-run PyPI/LLM-CLI scenario-test guidance.
 - Project settings for interpreter command, output directory, include/exclude
   filters, max events, and package installation command.
 - Run actions for Python scripts and pytest targets.

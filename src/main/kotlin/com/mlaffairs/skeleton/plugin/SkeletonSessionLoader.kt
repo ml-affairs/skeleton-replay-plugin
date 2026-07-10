@@ -13,6 +13,7 @@ data class SkeletonLoadedSession(
     val qualityMarkdownText: String?,
     val artifactsText: String,
     val reportPath: Path?,
+    val traceIndex: SkeletonTraceIndex,
 )
 
 class SkeletonSessionLoader {
@@ -28,6 +29,7 @@ class SkeletonSessionLoader {
         val workflowText = readOptional(manifest.artifacts.workflow)
         val qualityMarkdownText = readOptional(manifest.artifacts.quality_markdown)
         val reportPath = manifest.artifacts.report?.let { Path.of(it) }?.takeIf { Files.exists(it) }
+        val traceIndex = readTraceIndex(manifest.artifacts.trace)
         return SkeletonLoadedSession(
             manifest = manifest,
             sessionPath = sessionPath,
@@ -35,6 +37,7 @@ class SkeletonSessionLoader {
             qualityMarkdownText = qualityMarkdownText,
             artifactsText = artifactsSummary(manifest),
             reportPath = reportPath,
+            traceIndex = traceIndex,
         )
     }
 
@@ -44,6 +47,21 @@ class SkeletonSessionLoader {
             return null
         }
         return artifactPath.readText()
+    }
+
+    private fun readTraceIndex(path: String): SkeletonTraceIndex {
+        val tracePath = Path.of(path)
+        if (!Files.exists(tracePath)) {
+            return SkeletonTraceIndex.EMPTY
+        }
+        val events = tracePath.toFile().useLines { lines ->
+            lines
+                .map(String::trim)
+                .filter(String::isNotEmpty)
+                .mapNotNull { line -> runCatching { json.decodeFromString<SkeletonTraceEvent>(line) }.getOrNull() }
+                .toList()
+        }
+        return SkeletonTraceIndex.fromEvents(events)
     }
 
     private fun artifactsSummary(manifest: SkeletonSessionManifest): String {

@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.1.7
+
+- Added startup discovery in the Skeleton tool window for existing reports under
+  project test directories and the project-root `.skeleton` directory, plus a
+  manual rescan button for newly created reports.
+- Made discovered report labels project-relative and added an unload action to
+  return from a loaded report to the discovery screen.
+- Refined the discovered report list to use normal-case, left-aligned rows with
+  concise titles and secondary target/artifact context.
+- Added trace-backed Follow in IDE inlays for call arguments and paired return
+  values.
+- Kept return-event navigation focused on the returning callee instead of
+  jumping back to the caller.
+- Replaced deprecated verifier APIs in process listening and JCEF query setup.
+
 ## 0.1.6
 
 - Fixed a Tool Window initialization crash caused by unsupported CSS in Swing

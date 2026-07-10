@@ -1,5 +1,6 @@
 package com.mlaffairs.skeleton.plugin
 
+import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -17,6 +18,7 @@ class SkeletonReplaySelectionTest {
               "event_index": 2,
               "event_order": 7,
               "event_type": "return",
+              "call_id": 3,
               "endpoint": {
                 "module": "checkout",
                 "function": "reserve",
@@ -25,7 +27,8 @@ class SkeletonReplaySelectionTest {
                 "line": 24,
                 "node_id": "function:checkout.CheckoutService.reserve",
                 "class_name": "CheckoutService",
-                "endpoint_type": "function"
+                "endpoint_type": "function",
+                "callable_kind": "instance_method"
               },
               "caller": {
                 "module": "orders",
@@ -45,9 +48,11 @@ class SkeletonReplaySelectionTest {
         assertEquals(2, payload.event_index)
         assertEquals(7, payload.event_order)
         assertEquals("return", payload.event_type)
+        assertEquals(3L, payload.call_id)
         assertEquals("/project/checkout.py", payload.focusedEndpoint?.file)
         assertEquals(24, payload.focusedEndpoint?.line)
         assertEquals("checkout.CheckoutService.reserve", payload.focusedEndpoint?.qualified_name)
+        assertEquals("instance_method", payload.focusedEndpoint?.callable_kind)
         assertEquals("orders.main", payload.caller?.qualified_name)
     }
 
@@ -74,14 +79,14 @@ class SkeletonReplaySelectionTest {
     }
 
     @Test
-    fun returnEventsResolveCallerWhenControlReturnsToDifferentSourceContext() {
+    fun returnEventsStayOnFocusedEndpointWhenControlReturnsToDifferentSourceContext() {
         val focused = endpoint("/project/checkout.py", module = "checkout", function = "reserve")
         val caller = endpoint("/project/orders.py", module = "orders", function = "main")
         val resolver = SkeletonReplayEndpointResolver { endpoint -> endpoint.file?.startsWith("/project/") == true }
 
         val resolved = resolver.resolve(selection(focusedEndpoint = focused, caller = caller, eventType = "return"))
 
-        assertSame(caller, resolved)
+        assertSame(focused, resolved)
     }
 
     @Test
@@ -140,6 +145,53 @@ class SkeletonReplaySelectionTest {
         assertTrue(debouncer.submit(first))
     }
 
+    @Test
+    fun indexesTraceEventsByOrderAndPairsReturnsByCallId() {
+        val call = traceEvent(
+            """
+            {"event_type":"call","order":4,"depth":0,"call_id":4,"callee":{"module":"orders","function":"main","qualified_name":"orders.main","file":"/project/orders.py","line":12,"node_id":"function:orders.main","endpoint_type":"function","callable_kind":"module_function"},"args":{"order_id":{"type":"str","value":"A-1"}}}
+            """.trimIndent(),
+        )
+        val returned = traceEvent(
+            """
+            {"event_type":"return","order":5,"depth":0,"call_id":4,"callee":{"module":"orders","function":"main","qualified_name":"orders.main","file":"/project/orders.py","line":12,"node_id":"function:orders.main","endpoint_type":"function","callable_kind":"module_function"},"return_value":{"type":"bool","value":true}}
+            """.trimIndent(),
+        )
+        val index = SkeletonTraceIndex.fromEvents(listOf(call, returned))
+
+        assertSame(returned, index.eventFor(selection(eventOrder = 5, eventType = "return")))
+        assertSame(call, index.pairedCallFor(returned))
+        assertEquals("# order_id = \"A-1\"; return -> true", SkeletonTraceInlayFormatter.textForSelection(selection(eventOrder = 5, eventType = "return"), index))
+    }
+
+    @Test
+    fun pairsOldTraceReturnsWithoutCallIdsByNearestMatchingCallee() {
+        val firstCall = traceEvent(
+            """
+            {"event_type":"call","order":0,"depth":0,"callee":{"module":"orders","function":"outer","qualified_name":"orders.outer","file":"/project/orders.py","line":12,"node_id":"function:orders.outer","endpoint_type":"function"},"args":{"name":{"type":"str","value":"outer"}}}
+            """.trimIndent(),
+        )
+        val nestedCall = traceEvent(
+            """
+            {"event_type":"call","order":1,"depth":1,"callee":{"module":"orders","function":"inner","qualified_name":"orders.inner","file":"/project/orders.py","line":20,"node_id":"function:orders.inner","endpoint_type":"function"},"args":{"name":{"type":"str","value":"inner"}}}
+            """.trimIndent(),
+        )
+        val nestedReturn = traceEvent(
+            """
+            {"event_type":"return","order":2,"depth":1,"callee":{"module":"orders","function":"inner","qualified_name":"orders.inner","file":"/project/orders.py","line":20,"node_id":"function:orders.inner","endpoint_type":"function"},"return_value":{"type":"str","value":"done"}}
+            """.trimIndent(),
+        )
+        val firstReturn = traceEvent(
+            """
+            {"event_type":"return","order":3,"depth":0,"callee":{"module":"orders","function":"outer","qualified_name":"orders.outer","file":"/project/orders.py","line":12,"node_id":"function:orders.outer","endpoint_type":"function"},"return_value":{"type":"str","value":"done"}}
+            """.trimIndent(),
+        )
+        val index = SkeletonTraceIndex.fromEvents(listOf(firstCall, nestedCall, nestedReturn, firstReturn))
+
+        assertSame(nestedCall, index.pairedCallFor(nestedReturn))
+        assertSame(firstCall, index.pairedCallFor(firstReturn))
+    }
+
     private fun endpoint(file: String, module: String = "orders", function: String = "main"): SkeletonReplayEndpoint =
         SkeletonReplayEndpoint(
             module = module,
@@ -149,6 +201,7 @@ class SkeletonReplaySelectionTest {
             line = 12,
             node_id = "function:$module.$function",
             endpoint_type = "function",
+            callable_kind = "module_function",
         )
 
     private fun selection(
@@ -165,4 +218,7 @@ class SkeletonReplaySelectionTest {
             focusedEndpoint = focusedEndpoint,
             caller = caller,
         )
+
+    private fun traceEvent(json: String): SkeletonTraceEvent =
+        Json { ignoreUnknownKeys = true }.decodeFromString(json)
 }

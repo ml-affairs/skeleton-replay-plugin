@@ -3,8 +3,8 @@ package com.mlaffairs.skeleton.plugin
 import com.intellij.execution.ExecutionException
 import com.intellij.execution.configurations.GeneralCommandLine
 import com.intellij.execution.process.OSProcessHandler
-import com.intellij.execution.process.ProcessAdapter
 import com.intellij.execution.process.ProcessEvent
+import com.intellij.execution.process.ProcessListener
 import com.intellij.execution.process.ProcessOutputTypes
 import com.intellij.notification.NotificationGroupManager
 import com.intellij.notification.NotificationType
@@ -68,7 +68,7 @@ class SkeletonRunnerService(private val project: Project) {
             .withCharset(Charsets.UTF_8)
         try {
             val handler = OSProcessHandler(commandLine)
-            handler.addProcessListener(object : ProcessAdapter() {
+            handler.addProcessListener(object : ProcessListener {
                 override fun onTextAvailable(event: ProcessEvent, outputType: Key<*>) {
                     val prefix = if (outputType == ProcessOutputTypes.STDERR) "stderr: " else ""
                     workbench.appendLog(prefix + event.text)

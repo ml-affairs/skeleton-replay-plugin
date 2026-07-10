@@ -10,6 +10,7 @@ data class SkeletonReplaySelectionPayload(
     val event_index: Int,
     val event_order: Long,
     val event_type: String,
+    val call_id: Long? = null,
     @SerialName("endpoint")
     val focusedEndpoint: SkeletonReplayEndpoint? = null,
     val caller: SkeletonReplayEndpoint? = null,
@@ -25,6 +26,7 @@ data class SkeletonReplayEndpoint(
     val node_id: String? = null,
     val class_name: String? = null,
     val endpoint_type: String? = null,
+    val callable_kind: String? = null,
 )
 
 class SkeletonReplaySelectionDecoder {
@@ -42,21 +44,10 @@ class SkeletonReplayEndpointResolver(
     fun resolve(selection: SkeletonReplaySelectionPayload): SkeletonReplayEndpoint? {
         val focused = selection.focusedEndpoint
         val caller = selection.caller
-        if (
-            selection.event_type == "return" &&
-            caller != null &&
-            caller.hasSource() &&
-            isProjectLocal(caller) &&
-            caller.focusKey() != focused?.focusKey()
-        ) {
-            return caller
-        }
         return listOf(focused, caller)
             .filterNotNull()
             .firstOrNull { endpoint -> endpoint.file != null && isProjectLocal(endpoint) }
     }
-
-    private fun SkeletonReplayEndpoint.hasSource(): Boolean = file != null
 }
 
 fun SkeletonReplayEndpoint.focusKey(): String =
